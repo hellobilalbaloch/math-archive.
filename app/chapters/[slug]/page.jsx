@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/server";
+import { MathText } from "@/app/components/MathText";
 
-export default async function ChapterPage({ params }) {
+async function ChapterContent({ params }) {
   const { slug } = await params;
   const supabase = await createClient();
 
@@ -16,116 +18,120 @@ export default async function ChapterPage({ params }) {
     notFound();
   }
 
-  const { data: topicsData } = await supabase
+  const { data: topics } = await supabase
     .from("topics")
     .select("*")
     .eq("chapter_id", chapter.id)
     .order("sort_order", { ascending: true });
 
-  const topics = topicsData ?? [];
-  const topicIds = topics.map((t) => t.id);
+  const topicList = topics ?? [];
+  const topicIds = topicList.map((t) => t.id);
 
-  let concepts = [];
+  let conceptList = [];
   if (topicIds.length > 0) {
-    const { data: conceptsData } = await supabase
+    const { data: concepts } = await supabase
       .from("concepts")
-      .select("*")
+      .select("id, title, slug, topic_id, sort_order")
       .in("topic_id", topicIds)
-      .order("created_at", { ascending: true });
-    concepts = conceptsData ?? [];
+      .order("sort_order", { ascending: true });
+
+    conceptList = concepts ?? [];
   }
 
   const conceptsByTopic = new Map();
-  for (const concept of concepts) {
-    const list = conceptsByTopic.get(concept.topic_id) ?? [];
-    list.push(concept);
-    conceptsByTopic.set(concept.topic_id, list);
+  for (const concept of conceptList) {
+    const existing = conceptsByTopic.get(concept.topic_id) ?? [];
+    existing.push(concept);
+    conceptsByTopic.set(concept.topic_id, existing);
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl bg-[#131212] px-4 py-12 text-white sm:px-6">
-      <Link
-        href="/"
-        className="text-xs font-medium text-sky-400 transition hover:underline"
-      >
-        ← Back to Chapters
-      </Link>
+    <>
+      <nav className="flex items-center gap-2 text-xs text-zinc-400">
+        <Link href="/" className="text-sky-400 hover:underline">
+          Home
+        </Link>
+        <span>/</span>
+        <span className="text-zinc-300">{chapter.title}</span>
+      </nav>
 
-      <header className="mt-6 border-b border-white/10 pb-8">
+      <header className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">
           Chapter
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        <h1 className="mt-2 text-2xl font-semibold text-white sm:text-3xl">
           {chapter.title}
         </h1>
         {chapter.summary && (
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+          <p className="mt-2 text-sm leading-relaxed text-zinc-400">
             {chapter.summary}
           </p>
         )}
       </header>
 
-      <div className="mt-10 space-y-10">
-        {topics.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-sm text-zinc-400">
+      <div className="mt-8 space-y-6">
+        {topicList.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-zinc-400">
             No topics added to this chapter yet.
           </div>
         ) : (
-          topics.map((topic, tIdx) => {
+          topicList.map((topic, idx) => {
             const topicConcepts = conceptsByTopic.get(topic.id) ?? [];
+
             return (
               <section
                 key={topic.id}
                 className="rounded-xl border border-white/10 bg-white/[0.02] p-6"
               >
-                <div className="flex items-baseline justify-between gap-4 border-b border-white/10 pb-4">
-                  <div>
-                    <span className="text-xs font-medium text-sky-400">
-                      Topic {tIdx + 1}
-                    </span>
-                    <h2 className="mt-1 text-xl font-semibold text-white">
-                      {topic.title}
-                    </h2>
-                    {topic.summary && (
-                      <p className="mt-1 text-sm text-zinc-400">
-                        {topic.summary}
-                      </p>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs text-zinc-500">
-                    {topicConcepts.length}{" "}
-                    {topicConcepts.length === 1 ? "concept" : "concepts"}
-                  </span>
+                <div className="text-xs font-medium text-sky-400">
+                  Topic {String(idx + 1).padStart(2, "0")}
                 </div>
-
-                {topicConcepts.length === 0 ? (
-                  <p className="mt-4 text-xs text-zinc-500">
-                    No concepts published under this topic yet.
-                  </p>
-                ) : (
-                  <ul className="mt-4 divide-y divide-white/10">
-                    {topicConcepts.map((concept) => (
-                      <li key={concept.id} className="py-3">
-                        <Link
-                          href={`/concepts/${concept.slug}`}
-                          className="group flex items-center justify-between gap-4"
-                        >
-                          <span className="text-sm font-medium text-zinc-200 transition group-hover:text-sky-400">
-                            {concept.title}
-                          </span>
-                          <span className="text-xs text-zinc-500 transition group-hover:translate-x-0.5 group-hover:text-sky-400">
-                            Read →
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                <h2 className="mt-1 text-lg font-semibold text-white">
+                  {topic.title}
+                </h2>
+                {topic.description && (
+                  <div className="mt-2 text-sm leading-relaxed text-zinc-400">
+                    <MathText content={topic.description} />
+                  </div>
                 )}
+
+                <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
+                  {topicConcepts.length === 0 ? (
+                    <p className="text-xs text-zinc-500">
+                      No concepts in this topic yet.
+                    </p>
+                  ) : (
+                    topicConcepts.map((concept) => (
+                      <Link
+                        key={concept.id}
+                        href={`/concepts/${concept.slug}`}
+                        className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-zinc-200 transition hover:border-sky-400/50 hover:text-sky-400"
+                      >
+                        <span>{concept.title}</span>
+                        <span className="text-xs text-sky-400">Read →</span>
+                      </Link>
+                    ))
+                  )}
+                </div>
               </section>
             );
           })
         )}
       </div>
+    </>
+  );
+}
+
+export default function ChapterPage({ params }) {
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-12 text-white sm:px-6">
+      <Suspense
+        fallback={
+          <div className="h-64 animate-pulse rounded-xl border border-white/10 bg-white/[0.02]" />
+        }
+      >
+        <ChapterContent params={params} />
+      </Suspense>
     </main>
   );
 }

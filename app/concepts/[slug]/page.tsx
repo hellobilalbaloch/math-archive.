@@ -1,11 +1,14 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/server";
 import { MathText } from "@/app/components/MathText";
 
-// export const dynamic = "force-dynamic";
-
-export default async function ConceptPage({ params }) {
+async function ConceptContent({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
   const { slug } = await params;
   const supabase = await createClient();
 
@@ -19,8 +22,13 @@ export default async function ConceptPage({ params }) {
     notFound();
   }
 
-  let topic = null;
-  let chapter = null;
+  let topic: {
+    id: string;
+    title: string;
+    slug: string;
+    chapter_id: string;
+  } | null = null;
+  let chapter: { id: string; title: string; slug: string } | null = null;
 
   if (concept.topic_id) {
     const { data: topicData } = await supabase
@@ -43,8 +51,7 @@ export default async function ConceptPage({ params }) {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-12 text-white sm:px-6">
-      {/* Breadcrumb */}
+    <>
       <nav className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
         <Link href="/" className="text-sky-400 hover:underline">
           Home
@@ -68,7 +75,6 @@ export default async function ConceptPage({ params }) {
         )}
       </nav>
 
-      {/* Concept Card */}
       <article className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">
           Concept Note
@@ -81,7 +87,7 @@ export default async function ConceptPage({ params }) {
         {concept.intuition && (
           <section className="mt-6 border-t border-white/10 pt-6">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-sky-400">
-              Objective
+              Intuition
             </h2>
             <div className="mt-2 text-sm leading-relaxed text-zinc-300">
               <MathText content={concept.intuition} />
@@ -111,6 +117,24 @@ export default async function ConceptPage({ params }) {
           </section>
         )}
       </article>
+    </>
+  );
+}
+
+export default function ConceptPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  return (
+    <main className="mx-auto max-w-4xl px-4 py-12 text-white sm:px-6">
+      <Suspense
+        fallback={
+          <div className="h-64 animate-pulse rounded-xl border border-white/10 bg-white/[0.02]" />
+        }
+      >
+        <ConceptContent params={params} />
+      </Suspense>
     </main>
   );
 }

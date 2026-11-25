@@ -8,32 +8,38 @@ async function ChapterContent({ params }) {
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: chapter } = await supabase
+  const { data: chapter, error: chapterError } = await supabase
     .from("chapters")
     .select("*")
     .eq("slug", slug)
     .single();
 
-  if (!chapter) {
+  if (chapterError || !chapter) {
     notFound();
   }
 
-  const { data: topics } = await supabase
+  const { data: topics, error: topicsError } = await supabase
     .from("topics")
     .select("*")
-    .eq("chapter_id", chapter.id)
-    .order("sort_order", { ascending: true });
+    .eq("chapter_id", chapter.id);
+
+  if (topicsError) {
+    console.error("Error fetching topics:", topicsError);
+  }
 
   const topicList = topics ?? [];
   const topicIds = topicList.map((t) => t.id);
 
   let conceptList = [];
   if (topicIds.length > 0) {
-    const { data: concepts } = await supabase
+    const { data: concepts, error: conceptsError } = await supabase
       .from("concepts")
-      .select("id, title, slug, topic_id, sort_order")
-      .in("topic_id", topicIds)
-      .order("sort_order", { ascending: true });
+      .select("*")
+      .in("topic_id", topicIds);
+
+    if (conceptsError) {
+      console.error("Error fetching concepts:", conceptsError);
+    }
 
     conceptList = concepts ?? [];
   }

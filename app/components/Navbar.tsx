@@ -2,13 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/client";
-import { AUTHOR_NAME, isAuthorizedOwner } from "@/app/lib/auth";
+import { isAuthorizedOwner } from "@/app/lib/auth";
 
 export function Navbar() {
   const router = useRouter();
-  const pathname = usePathname();
   const [isOwner, setIsOwner] = useState(false);
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -33,10 +32,6 @@ export function Navbar() {
     };
   }, []);
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [pathname]);
-
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -57,7 +52,6 @@ export function Navbar() {
             <span className="truncate text-base font-semibold tracking-tight text-white">
               Math Archive
             </span>
-           
           </Link>
 
           <nav
@@ -81,6 +75,7 @@ export function Navbar() {
             <>
               <Link
                 href="/studio"
+                onClick={() => setMenuOpen(false)}
                 className="inline-flex min-h-9 items-center rounded-md bg-sky-500 px-3 py-1.5 text-xs font-medium text-zinc-950 transition hover:bg-sky-400 sm:px-3.5"
               >
                 Studio
@@ -96,6 +91,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
+              onClick={() => setMenuOpen(false)}
               className="inline-flex min-h-9 items-center rounded-md border border-white/15 px-3.5 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-sky-400/60 hover:text-sky-400"
             >
               Login

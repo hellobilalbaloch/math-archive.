@@ -3,13 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/app/lib/supabase/server";
 import { MathText } from "@/app/components/MathText";
+import { ConceptRichContent } from "@/app/components/ConceptCallouts";
 import { SectionTracker } from "@/app/components/SectionTracker";
+import { ConceptReadingTracker } from "@/app/components/ConceptReadingTracker";
 
-async function ConceptContent({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+async function ConceptContent({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = await createClient();
 
@@ -23,15 +21,10 @@ async function ConceptContent({
     notFound();
   }
 
-  let topic: {
-    id: string;
-    title: string;
-    slug: string;
-    chapter_id: string;
-  } | null = null;
-  let chapter: { id: string; title: string; slug: string } | null = null;
-  let prevConcept: { title: string; slug: string } | null = null;
-  let nextConcept: { title: string; slug: string } | null = null;
+  let topic = null;
+  let chapter = null;
+  let prevConcept = null;
+  let nextConcept = null;
 
   if (concept.topic_id) {
     const { data: topicData } = await supabase
@@ -76,7 +69,7 @@ async function ConceptContent({
     concept.key_takeaway
       ? { id: "key-takeaway", label: "03 · Key Takeaway" }
       : null,
-  ].filter((item): item is { id: string; label: string } => item !== null);
+  ].filter((item) => item !== null);
 
   return (
     <>
@@ -115,6 +108,11 @@ async function ConceptContent({
       {/* Sticky Section Jump Strip */}
       <div className="mt-4">
         <SectionTracker sections={availableSections} title="Jump to" />
+      </div>
+
+      {/* Reading Progress & Reviewed Toggle */}
+      <div className="mt-3">
+        <ConceptReadingTracker conceptId={concept.id} slug={concept.slug} />
       </div>
 
       {/* Main Concept Article */}
@@ -177,7 +175,7 @@ async function ConceptContent({
               </div>
 
               <div className="mt-4 min-w-0 text-zinc-200">
-                <MathText content={concept.explanation} />
+                <ConceptRichContent content={concept.explanation} />
               </div>
             </section>
           )}

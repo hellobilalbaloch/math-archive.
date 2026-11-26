@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface TrackerSection {
   id: string;
@@ -15,9 +15,17 @@ interface SectionTrackerProps {
 export function SectionTracker({ sections, title }: SectionTrackerProps) {
   const [activeId, setActiveId] = useState<string>(sections[0]?.id ?? "");
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const jumpTimerRef = useRef<number | null>(null);
+  const isJumpingRef = useRef(false);
+
+  const sectionsKey = useMemo(
+    () => sections.map((s) => `${s.id}:${s.label}`).join("|"),
+    [sections]
+  );
 
   useEffect(() => {
-    if (sections.length === 0) return;
+    if (sections.length <= 1) return;
 
     const elements = sections
       .map((s) => document.getElementById(s.id))
@@ -27,36 +35,56 @@ export function SectionTracker({ sections, title }: SectionTrackerProps) {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        if (isJumpingRef.current) return;
+
         const visible = entries
           .filter((entry) => entry.isIntersecting)
-          .sort(
-            (a, b) =>
-              a.boundingClientRect.top - b.boundingClientRect.top
-          );
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
 
         if (visible.length > 0) {
-          setActiveId(visible[0].target.id);
+          const topId = visible[0].target.id;
+          setActiveId((prev) => (prev === topId ? prev : topId));
         }
       },
       {
-        rootMargin: "-20% 0px -65% 0px",
+        rootMargin: "-18% 0px -65% 0px",
         threshold: 0,
       }
     );
 
     elements.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
-  }, [sections]);
+
+    return () => {
+      observer.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionsKey]);
 
   useEffect(() => {
     if (!activeId) return;
+    const container = scrollContainerRef.current;
     const activePill = pillRefs.current.get(activeId);
-    activePill?.scrollIntoView({
-      behavior: "smooth",
-      inline: "center",
-      block: "nearest",
+    if (!container || !activePill) return;
+
+    // Scroll only the horizontal pill strip—never the outer window
+    const targetLeft =
+      activePill.offsetLeft -
+      container.clientWidth / 2 +
+      activePill.clientWidth / 2;
+
+    container.scrollTo({
+      left: Math.max(0, targetLeft),
+      behavior: "auto",
     });
   }, [activeId]);
+
+  useEffect(() => {
+    return () => {
+      if (jumpTimerRef.current !== null) {
+        window.clearTimeout(jumpTimerRef.current);
+      }
+    };
+  }, []);
 
   if (sections.length <= 1) return null;
 
@@ -65,16 +93,30 @@ export function SectionTracker({ sections, title }: SectionTrackerProps) {
     const target = document.getElementById(id);
     if (!target) return;
 
+    isJumpingRef.current = true;
+    if (jumpTimerRef.current !== null) {
+      window.clearTimeout(jumpTimerRef.current);
+    }
+
     const navbarOffset = 128;
-    const y =
-      target.getBoundingClientRect().top + window.scrollY - navbarOffset;
+    const y = Math.max(
+      0,
+      target.getBoundingClientRect().top + window.scrollY - navbarOffset
+    );
 
     window.scrollTo({ top: y, behavior: "smooth" });
+
+    jumpTimerRef.current = window.setTimeout(() => {
+      isJumpingRef.current = false;
+    }, 650);
   }
 
   return (
     <div className="sticky top-[61px] z-30 -mx-4 mb-6 border-b border-white/10 bg-[#131212]/90 px-4 py-2.5 backdrop-blur sm:-mx-6 sm:px-6">
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+      <div
+        ref={scrollContainerRef}
+        className="no-scrollbar flex items-center gap-2 overflow-x-auto"
+      >
         {title && (
           <span className="shrink-0 pr-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
             {title}:
@@ -92,7 +134,7 @@ export function SectionTracker({ sections, title }: SectionTrackerProps) {
               }}
               type="button"
               onClick={() => scrollToSection(section.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 isActive
                   ? "border-sky-400/60 bg-sky-500/15 text-sky-300 shadow-[0_0_16px_-4px_rgba(56,189,248,0.45)]"
                   : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/25 hover:text-zinc-200"

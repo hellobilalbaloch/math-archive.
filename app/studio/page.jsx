@@ -1,10 +1,18 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/app/lib/supabase/client";
 import { AUTHOR_NAME, isAuthorizedOwner } from "@/app/lib/auth";
 import { MathText } from "@/app/components/MathText";
+import { SnippetToolbar } from "@/app/components/SnippetToolbar";
+import { ConceptRichContent } from "@/app/components/ConceptCallouts";
+import {
+  clearCreateDraft,
+  loadCreateDraft,
+  saveCreateDraft,
+  StatusBannerWithLink,
+} from "@/app/components/StudioDraftBanner";
 
 function slugify(text) {
   return (text || "")
@@ -35,12 +43,18 @@ export default function StudioPage() {
   const [topicDescription, setTopicDescription] = useState("");
   const [topicOrder, setTopicOrder] = useState(1);
 
+  // Refs for textareas
+  const explanationTextareaRef = useRef(null);
+  const editExplanationTextareaRef = useRef(null);
+  const draftHydratedRef = useRef(false);
+
   // Create: Concept
   const [selectedTopicId, setSelectedTopicId] = useState("");
   const [conceptTitle, setConceptTitle] = useState("");
   const [conceptIntuition, setConceptIntuition] = useState("");
   const [conceptExplanation, setConceptExplanation] = useState("");
   const [conceptTakeaway, setConceptTakeaway] = useState("");
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // Edit state
   const [editingChapterId, setEditingChapterId] = useState(null);
@@ -64,6 +78,7 @@ export default function StudioPage() {
   // Delete confirmation & UI feedback
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [statusMsg, setStatusMsg] = useState(null);
+  const [lastSavedSlug, setLastSavedSlug] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -97,10 +112,69 @@ export default function StudioPage() {
     setSelectedChapterId((prev) =>
       nextChapters.some((c) => c.id === prev) ? prev : nextChapters[0]?.id ?? ""
     );
-    setSelectedTopicId((prev) =>
-      nextTopics.some((t) => t.id === prev) ? prev : nextTopics[0]?.id ?? ""
-    );
+
+    const savedDraft = !draftHydratedRef.current ? loadCreateDraft() : null;
+    setSelectedTopicId((prev) => {
+      if (
+        savedDraft?.selectedTopicId &&
+        nextTopics.some((t) => t.id === savedDraft.selectedTopicId)
+      ) {
+        return savedDraft.selectedTopicId;
+      }
+      return nextTopics.some((t) => t.id === prev) ? prev : nextTopics[0]?.id ?? "";
+    });
   }
+
+  useEffect(() => {
+    const savedDraft = loadCreateDraft();
+    if (savedDraft) {
+      const hasContent = Boolean(
+        savedDraft.conceptTitle ||
+          savedDraft.conceptIntuition ||
+          savedDraft.conceptExplanation ||
+          savedDraft.conceptTakeaway
+      );
+      if (hasContent) {
+        setConceptTitle(savedDraft.conceptTitle ?? "");
+        setConceptIntuition(savedDraft.conceptIntuition ?? "");
+        setConceptExplanation(savedDraft.conceptExplanation ?? "");
+        setConceptTakeaway(savedDraft.conceptTakeaway ?? "");
+        setDraftRestored(true);
+      }
+    }
+    draftHydratedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydratedRef.current) return;
+
+    const hasContent = Boolean(
+      conceptTitle.trim() ||
+        conceptIntuition.trim() ||
+        conceptExplanation.trim() ||
+        conceptTakeaway.trim()
+    );
+
+    if (!hasContent) {
+      clearCreateDraft();
+      setDraftRestored(false);
+      return;
+    }
+
+    saveCreateDraft({
+      selectedTopicId,
+      conceptTitle,
+      conceptIntuition,
+      conceptExplanation,
+      conceptTakeaway,
+    });
+  }, [
+    selectedTopicId,
+    conceptTitle,
+    conceptIntuition,
+    conceptExplanation,
+    conceptTakeaway,
+  ]);
 
   useEffect(() => {
     let active = true;
@@ -141,6 +215,7 @@ export default function StudioPage() {
   async function handleCreateChapter(e) {
     e.preventDefault();
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setConfirmDeleteId(null);
     setBusy(true);
@@ -176,6 +251,7 @@ export default function StudioPage() {
   async function handleCreateTopic(e) {
     e.preventDefault();
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setConfirmDeleteId(null);
 
@@ -217,6 +293,7 @@ export default function StudioPage() {
   async function handleCreateConcept(e) {
     e.preventDefault();
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setConfirmDeleteId(null);
 
@@ -243,12 +320,24 @@ export default function StudioPage() {
       return;
     }
 
+    clearCreateDraft();
+    setDraftRestored(false);
     setConceptTitle("");
     setConceptIntuition("");
     setConceptExplanation("");
     setConceptTakeaway("");
+    setLastSavedSlug(slug);
     setStatusMsg("Concept published.");
     await loadArchiveData();
+  }
+
+  function handleDiscardDraft() {
+    clearCreateDraft();
+    setDraftRestored(false);
+    setConceptTitle("");
+    setConceptIntuition("");
+    setConceptExplanation("");
+    setConceptTakeaway("");
   }
 
   // --- EDIT HANDLERS ---
@@ -266,6 +355,7 @@ export default function StudioPage() {
     if (!editingChapterId) return;
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -306,6 +396,7 @@ export default function StudioPage() {
     if (!editingTopicId) return;
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -348,6 +439,7 @@ export default function StudioPage() {
     if (!editingConceptId) return;
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -372,6 +464,7 @@ export default function StudioPage() {
     }
 
     setEditingConceptId(null);
+    setLastSavedSlug(slug);
     setStatusMsg("Concept updated.");
     await loadArchiveData();
   }
@@ -385,6 +478,7 @@ export default function StudioPage() {
     }
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -414,6 +508,7 @@ export default function StudioPage() {
     }
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -443,6 +538,7 @@ export default function StudioPage() {
     }
 
     setStatusMsg(null);
+    setLastSavedSlug(null);
     setErrorMsg(null);
     setBusy(true);
 
@@ -477,6 +573,13 @@ export default function StudioPage() {
     );
   }
 
+  const hasDraftContent = Boolean(
+    conceptTitle.trim() ||
+      conceptIntuition.trim() ||
+      conceptExplanation.trim() ||
+      conceptTakeaway.trim()
+  );
+
   return (
     <main className="mx-auto min-h-screen max-w-6xl bg-[#131212] px-4 py-10 text-white sm:px-6">
       {/* Header */}
@@ -503,11 +606,7 @@ export default function StudioPage() {
       </div>
 
       {/* Status & Error Banners */}
-      {statusMsg && (
-        <div className="mt-6 rounded-md border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs text-sky-200">
-          {statusMsg}
-        </div>
-      )}
+      <StatusBannerWithLink message={statusMsg} slug={lastSavedSlug} />
 
       {errorMsg && (
         <div className="mt-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs text-red-300">
@@ -706,7 +805,14 @@ export default function StudioPage() {
             <label className="block text-xs text-zinc-400">
               Explanation &amp; LaTeX
             </label>
+            <SnippetToolbar
+              textareaRef={editExplanationTextareaRef}
+              value={editConceptExplanation}
+              onChange={setEditConceptExplanation}
+              className="mt-2 mb-2"
+            />
             <textarea
+              ref={editExplanationTextareaRef}
               rows={6}
               required
               value={editConceptExplanation}
@@ -730,7 +836,7 @@ export default function StudioPage() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-400">
               Live KaTeX Preview (Edit)
             </p>
-            <MathText content={editConceptExplanation} />
+            <ConceptRichContent content={editConceptExplanation} />
           </div>
 
           <button
@@ -867,9 +973,16 @@ export default function StudioPage() {
         onSubmit={handleCreateConcept}
         className="mt-8 space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-6"
       >
-        <h2 className="text-lg font-semibold text-white">
-          New Math Concept (KaTeX)
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-white">
+            New Math Concept (KaTeX)
+          </h2>
+          {hasDraftContent && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-medium text-sky-300">
+              {draftRestored ? "Draft Restored" : "Auto-Saved to Browser"}
+            </span>
+          )}
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -920,8 +1033,15 @@ export default function StudioPage() {
             Explanation &amp; LaTeX (use $...$ for inline, $$...$$ for display
             math)
           </label>
+          <SnippetToolbar
+            textareaRef={explanationTextareaRef}
+            value={conceptExplanation}
+            onChange={setConceptExplanation}
+            className="mt-2 mb-2"
+          />
           <textarea
-            rows={6}
+            ref={explanationTextareaRef}
+            rows={8}
             required
             value={conceptExplanation}
             onChange={(e) => setConceptExplanation(e.target.value)}
@@ -956,21 +1076,34 @@ export default function StudioPage() {
               <MathText content={conceptIntuition} />
             </div>
           )}
+
           <div>
-            <p className="mb-1 text-xs font-medium text-zinc-400">
+            <p className="mb-2 text-xs font-medium text-zinc-400">
               Explanation
             </p>
-            <MathText content={conceptExplanation} />
+            <ConceptRichContent content={conceptExplanation} />
           </div>
         </div>
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-md bg-sky-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:opacity-60"
-        >
-          Publish Concept
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-md bg-sky-500 px-4 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:opacity-60"
+          >
+            Publish Concept
+          </button>
+
+          {hasDraftContent && (
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="rounded-md border border-white/15 bg-white/[0.03] px-3.5 py-2 text-xs font-medium text-zinc-300 transition hover:border-red-400/40 hover:text-red-300"
+            >
+              Discard Draft
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Published Items Lists with View, Edit & Delete Actions */}

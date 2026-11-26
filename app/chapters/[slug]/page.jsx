@@ -5,8 +5,6 @@ import { createClient } from "@/app/lib/supabase/server";
 import { MathText } from "@/app/components/MathText";
 import { SectionTracker } from "@/app/components/SectionTracker";
 
-export const dynamic = "force-dynamic";
-
 async function ChapterContent({ params }) {
   const { slug } = await params;
   const supabase = await createClient();

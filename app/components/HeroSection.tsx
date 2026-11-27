@@ -13,6 +13,7 @@ export function HeroSection() {
       </h1>
       <p className="mt-5 max-w-2xl text-base leading-relaxed text-zinc-300 sm:text-lg">
         Organized systematically by chapter and topic for effortless navigation. Explore freely without requiring a login, or revisit any concept to understand the reasoning and derivation behind each formula.
+        Developed by <a href="https://www.linkedin.com/in/bilal-b-778921450?utm_source=share_via&utm_content=profile&utm_medium=member_android">Bilal Baloch</a>
       </p>
       <div className="mt-8 flex flex-wrap items-center gap-4">
         <Link

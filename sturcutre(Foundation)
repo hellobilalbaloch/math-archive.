@@ -1,0 +1,12 @@
+/*Foundation structure katex and latex. Taliwind-v5*/
+nothing to commit, working tree clean
+Enumerating objects: 27, done.
+Counting objects: 100% (27/27), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (13/13), done.
+Writing objects: 100% (16/16), 9.17 KiB | 1.83 MiB/s, done.
+Total 16 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (8/8), completed with 8 local objects.
+To https://github.com/hellobilalbaloch/math-archive..git
+   99d9db5..e222e4d  main -> main
+branch 'main' set up to track 'origin/main'.
